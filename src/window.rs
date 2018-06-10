@@ -31,11 +31,11 @@ impl Window {
             let mut msg: winuser::MSG = mem::uninitialized();
 
             while user32::PeekMessageA(
-                &mut msg as *mut winuser::MSG,
-                0 as winapi::HWND,
-                0,
-                0,
-                winuser::PM_REMOVE,
+                &mut msg as *mut winuser::MSG, // lpMsg
+                0 as winapi::HWND,             // hWnd
+                0,                             // wMsgFilterMin
+                0,                             // wMsgFilterMax
+                winuser::PM_REMOVE,            // wRemoveMsg
             ) != 0
             {
                 if msg.message == winuser::WM_QUIT {
@@ -64,7 +64,7 @@ fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<win
         let title = winstr(title);
 
         let wndc = winuser::WNDCLASSW {
-            style: style,
+            style,
             lpfnWndProc: Some(window_proc),
             cbClsExtra: 0,
             cbWndExtra: 0,
@@ -127,6 +127,6 @@ unsafe extern "system" fn window_proc(
             user32::PostQuitMessage(0);
             0
         }
-        _ => return user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
+        _ => user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
     }
 }
