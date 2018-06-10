@@ -1,16 +1,16 @@
-extern crate winapi;
-extern crate user32;
-extern crate kernel32;
 extern crate gdi32;
+extern crate kernel32;
+extern crate user32;
+extern crate winapi;
 
-use self::winapi::winuser;
 use self::winapi::wingdi;
-use std::iter::once;
+use self::winapi::winuser;
 use std::ffi::OsStr;
+use std::io::Error;
+use std::iter::once;
+use std::mem;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
-use std::io::Error;
-use std::mem;
 
 pub struct Window {
     _handle: winapi::HWND,
@@ -21,8 +21,8 @@ impl Window {
         Window {
             _handle: match create_window(name, title, width, height) {
                 Ok(window_handle) => window_handle,
-                Err(error) => panic!("Window creation failed. {:?}", error)
-            }
+                Err(error) => panic!("Window creation failed. {:?}", error),
+            },
         }
     }
 
@@ -30,7 +30,14 @@ impl Window {
         unsafe {
             let mut msg: winuser::MSG = mem::uninitialized();
 
-            while user32::PeekMessageA(&mut msg as *mut winuser::MSG, 0 as winapi::HWND, 0, 0, winuser::PM_REMOVE) != 0 {
+            while user32::PeekMessageA(
+                &mut msg as *mut winuser::MSG,
+                0 as winapi::HWND,
+                0,
+                0,
+                winuser::PM_REMOVE,
+            ) != 0
+            {
                 if msg.message == winuser::WM_QUIT {
                     return false;
                 }
@@ -66,24 +73,24 @@ fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<win
             hCursor: cursor,
             hbrBackground: background,
             lpszMenuName: null_mut(),
-            lpszClassName: name.as_ptr()
+            lpszClassName: name.as_ptr(),
         };
 
         user32::RegisterClassW(&wndc);
 
         let window_handle = user32::CreateWindowExW(
-            winuser::WS_EX_OVERLAPPEDWINDOW, // dwExStyle
-            name.as_ptr(), // lpClassName
-            title.as_ptr(), // lpWindowName
+            winuser::WS_EX_OVERLAPPEDWINDOW,                    // dwExStyle
+            name.as_ptr(),                                      // lpClassName
+            title.as_ptr(),                                     // lpWindowName
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
-            winuser::CW_USEDEFAULT, // x
-            winuser::CW_USEDEFAULT, // y
-            width, // nWidth
-            height, // nHeight
-            null_mut(), // hWndParent
-            null_mut(), // hMenu
-            h_instance, // hInstance
-            null_mut() // lpParam
+            winuser::CW_USEDEFAULT,                             // x
+            winuser::CW_USEDEFAULT,                             // y
+            width,                                              // nWidth
+            height,                                             // nHeight
+            null_mut(),                                         // hWndParent
+            null_mut(),                                         // hMenu
+            h_instance,                                         // hInstance
+            null_mut(),                                         // lpParam
         );
 
         if window_handle.is_null() {
@@ -98,9 +105,14 @@ fn winstr(value: &str) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(once(0)).collect()
 }
 
-unsafe extern "system" fn window_proc(h_wnd: winapi::HWND, msg: winapi::UINT, w_param: winapi::WPARAM, l_param: winapi::LPARAM) -> winapi::LRESULT {
+unsafe extern "system" fn window_proc(
+    h_wnd: winapi::HWND,
+    msg: winapi::UINT,
+    w_param: winapi::WPARAM,
+    l_param: winapi::LPARAM,
+) -> winapi::LRESULT {
     let mut ps: winuser::PAINTSTRUCT = mem::uninitialized();
-    
+
     match msg {
         winuser::WM_PAINT => {
             let hdc = user32::BeginPaint(h_wnd, &mut ps);
@@ -110,11 +122,11 @@ unsafe extern "system" fn window_proc(h_wnd: winapi::HWND, msg: winapi::UINT, w_
 
             user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
             0
-        },
+        }
         winuser::WM_DESTROY => {
             user32::PostQuitMessage(0);
             0
-        },
-        _ => return user32::DefWindowProcW(h_wnd, msg, w_param, l_param)
+        }
+        _ => return user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
     }
 }
