@@ -19,12 +19,28 @@ pub struct Window {
 impl Window {
     pub fn new(name: &str, title: &str, width: i32, height: i32) -> Window {
         Window {
-            _handle: create_window(name, title, width, height).unwrap()
+            _handle: match create_window(name, title, width, height) {
+                Ok(window_handle) => window_handle,
+                Err(error) => panic!("Window creation failed. {:?}", error)
+            }
         }
     }
 
     pub fn dispatch_messages(&self) -> bool {
-        dispatch_messages()
+        unsafe {
+            let mut msg: winuser::MSG = mem::uninitialized();
+
+            while user32::PeekMessageA(&mut msg as *mut winuser::MSG, 0 as winapi::HWND, 0, 0, winuser::PM_REMOVE) != 0 {
+                if msg.message == winuser::WM_QUIT {
+                    return false;
+                }
+
+                user32::TranslateMessage(&msg as *const winuser::MSG);
+                user32::DispatchMessageW(&msg as *const winuser::MSG);
+            }
+
+            true
+        }
     }
 }
 
@@ -78,23 +94,6 @@ fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<win
     }
 }
 
-fn dispatch_messages() -> bool {
-    unsafe {
-        let mut msg: winuser::MSG = mem::uninitialized();
-
-        while user32::PeekMessageA(&mut msg as *mut winuser::MSG, 0 as winapi::HWND, 0, 0, winuser::PM_REMOVE) != 0 {
-            if msg.message == winuser::WM_QUIT {
-                return false;
-            }
-
-            user32::TranslateMessage(&msg as *const winuser::MSG);
-            user32::DispatchMessageW(&msg as *const winuser::MSG);
-        }
-
-        true
-    }
-}
-
 fn winstr(value: &str) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(once(0)).collect()
 }
@@ -107,7 +106,7 @@ unsafe extern "system" fn window_proc(h_wnd: winapi::HWND, msg: winapi::UINT, w_
             let hdc = user32::BeginPaint(h_wnd, &mut ps);
             gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
 
-            gdi32::Rectangle(hdc, 10, 10, 20, 20);
+            gdi32::Rectangle(hdc, 20, 20, 40, 40);
 
             user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
             0
