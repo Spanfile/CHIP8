@@ -1,10 +1,11 @@
 mod window;
+use window::Window;
 
 fn main() {
-    let wndc = window::create_window("chip8_window", "CHIP8", 640, 320).unwrap();
+    let window = Window::new("chip8_window", "CHIP8", 640, 320);
 
     loop {
-        if !window::handle_message(&wndc) {
+        if !window.dispatch_messages() {
             break;
         }
     }

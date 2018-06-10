@@ -12,7 +12,23 @@ use std::ptr::null_mut;
 use std::io::Error;
 use std::mem;
 
-pub fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<winapi::HWND, Error> {
+pub struct Window {
+    _handle: winapi::HWND,
+}
+
+impl Window {
+    pub fn new(name: &str, title: &str, width: i32, height: i32) -> Window {
+        Window {
+            _handle: create_window(name, title, width, height).unwrap()
+        }
+    }
+
+    pub fn dispatch_messages(&self) -> bool {
+        dispatch_messages()
+    }
+}
+
+fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<winapi::HWND, Error> {
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
 
@@ -62,16 +78,20 @@ pub fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result
     }
 }
 
-pub fn handle_message(window: &winapi::HWND) -> bool {
+fn dispatch_messages() -> bool {
     unsafe {
         let mut msg: winuser::MSG = mem::uninitialized();
-        if user32::GetMessageW(&mut msg as *mut winuser::MSG, *window, 0, 0) > 0 {
+
+        while user32::PeekMessageA(&mut msg as *mut winuser::MSG, 0 as winapi::HWND, 0, 0, winuser::PM_REMOVE) != 0 {
+            if msg.message == winuser::WM_QUIT {
+                return false;
+            }
+
             user32::TranslateMessage(&msg as *const winuser::MSG);
             user32::DispatchMessageW(&msg as *const winuser::MSG);
-            true
-        } else {
-            false
         }
+
+        true
     }
 }
 
