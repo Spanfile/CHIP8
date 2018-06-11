@@ -5,29 +5,37 @@ extern crate winapi;
 
 use self::winapi::wingdi;
 use self::winapi::winuser;
+use screen::Screen;
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Error;
 use std::iter::once;
 use std::mem;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
+use std::sync::Mutex;
+
+lazy_static! {
+    static ref SCREEN_LOOKUP: Mutex<HashMap<i32, Box<Screen>>> = {
+        let m = HashMap::new();
+        Mutex::new(m)
+    };
+}
 
 pub struct Window {
-    _handle: winapi::HWND,
+    handle: winapi::HWND,
 }
 
 impl Default for Window {
     fn default() -> Window {
-        Window {
-            _handle: null_mut(),
-        }
+        Window { handle: null_mut() }
     }
 }
 
 impl Window {
-    pub fn new(name: &str, title: &str, width: i32, height: i32) -> Window {
+    pub fn new(name: &str, title: &str, width: i32, height: i32, scale: i32) -> Window {
         Window {
-            _handle: match create_window(name, title, width, height) {
+            handle: match create_window(name, title, width, height, scale) {
                 Ok(window_handle) => window_handle,
                 Err(error) => panic!("Window creation failed. {:?}", error),
             },
@@ -57,9 +65,24 @@ impl Window {
             true
         }
     }
+
+    pub fn set_pixel(&self, x: i32, y: i32) {
+        let screen_lookup = SCREEN_LOOKUP.lock().unwrap();
+        let screen = match screen_lookup.get(&(self.handle as i32)) {
+            Some(scr) => scr,
+            None => panic!("no screen found for HWND {:?}", self.handle as i32),
+        };
+        (*screen).set_pixel(x, y);
+    }
 }
 
-fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<winapi::HWND, Error> {
+fn create_window(
+    name: &str,
+    title: &str,
+    width: i32,
+    height: i32,
+    scale: i32,
+) -> Result<winapi::HWND, Error> {
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
 
@@ -93,13 +116,19 @@ fn create_window(name: &str, title: &str, width: i32, height: i32) -> Result<win
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
             winuser::CW_USEDEFAULT,                             // x
             winuser::CW_USEDEFAULT,                             // y
-            width,                                              // nWidth
-            height,                                             // nHeight
+            width * scale,                                      // nWidth
+            height * scale,                                     // nHeight
             null_mut(),                                         // hWndParent
             null_mut(),                                         // hMenu
             h_instance,                                         // hInstance
             null_mut(),                                         // lpParam
         );
+
+        let screen = Box::new(Screen::new(width, height, scale));
+        SCREEN_LOOKUP
+            .lock()
+            .unwrap()
+            .insert(window_handle as i32, screen);
 
         if window_handle.is_null() {
             Err(Error::last_os_error())
@@ -126,7 +155,19 @@ unsafe extern "system" fn window_proc(
             let hdc = user32::BeginPaint(h_wnd, &mut ps);
             gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
 
-            gdi32::Rectangle(hdc, 10, 10, 20, 20);
+            let screen_lookup = SCREEN_LOOKUP.lock().unwrap();
+            let screen = match screen_lookup.get(&(h_wnd as i32)) {
+                Some(scr) => scr,
+                None => panic!("no screen found for HWND {:?}", h_wnd as i32),
+            };
+
+            for (i, pixel) in (*screen).buffer.iter().enumerate() {
+                if *pixel {
+                    let x = i as i32 % (*screen).width;
+                    let y = i as i32 / (*screen).width;
+                    gdi32::Rectangle(hdc, x, y, x + (*screen).scale, y + (*screen).scale);
+                }
+            }
 
             user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
             0

@@ -1,4 +1,8 @@
+#[macro_use]
+extern crate lazy_static;
+
 mod emulator;
+mod screen;
 mod window;
 
 use emulator::Emulator;

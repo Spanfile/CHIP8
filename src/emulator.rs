@@ -10,12 +10,7 @@ impl Emulator {
         let screen_w = 64;
         let screen_h = 32;
         Emulator {
-            _window: Window::new(
-                "chip8_window",
-                "CHIP8",
-                screen_w * window_scale,
-                screen_h * window_scale,
-            ),
+            _window: Window::new("chip8_window", "CHIP8", screen_w, screen_h, window_scale),
             ..Default::default()
         }
     }
