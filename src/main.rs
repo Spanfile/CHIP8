@@ -1,11 +1,13 @@
+mod emulator;
 mod window;
-use window::Window;
+
+use emulator::Emulator;
 
 fn main() {
-    let window = Window::new("chip8_window", "CHIP8", 1280, 640);
+    let emulator = Emulator::new(10);
 
     loop {
-        if !window.dispatch_messages() {
+        if !emulator.process_events() {
             break;
         }
     }

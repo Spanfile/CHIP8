@@ -16,6 +16,14 @@ pub struct Window {
     _handle: winapi::HWND,
 }
 
+impl Default for Window {
+    fn default() -> Window {
+        Window {
+            _handle: null_mut(),
+        }
+    }
+}
+
 impl Window {
     pub fn new(name: &str, title: &str, width: i32, height: i32) -> Window {
         Window {
@@ -28,22 +36,22 @@ impl Window {
 
     pub fn dispatch_messages(&self) -> bool {
         unsafe {
-            let mut msg: winuser::MSG = mem::uninitialized();
+            let msg: winuser::LPMSG = mem::uninitialized();
 
-            while user32::PeekMessageA(
-                &mut msg as *mut winuser::MSG, // lpMsg
-                0 as winapi::HWND,             // hWnd
-                0,                             // wMsgFilterMin
-                0,                             // wMsgFilterMax
-                winuser::PM_REMOVE,            // wRemoveMsg
+            while user32::PeekMessageW(
+                msg,                // lpMsg
+                0 as winapi::HWND,  // hWnd
+                0,                  // wMsgFilterMin
+                0,                  // wMsgFilterMax
+                winuser::PM_REMOVE, // wRemoveMsg
             ) != 0
             {
-                if msg.message == winuser::WM_QUIT {
+                if (*msg).message == winuser::WM_QUIT {
                     return false;
                 }
 
-                user32::TranslateMessage(&msg as *const winuser::MSG);
-                user32::DispatchMessageW(&msg as *const winuser::MSG);
+                user32::TranslateMessage(msg as *const winuser::MSG);
+                user32::DispatchMessageW(msg as *const winuser::MSG);
             }
 
             true
@@ -118,7 +126,7 @@ unsafe extern "system" fn window_proc(
             let hdc = user32::BeginPaint(h_wnd, &mut ps);
             gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
 
-            gdi32::Rectangle(hdc, 20, 20, 40, 40);
+            gdi32::Rectangle(hdc, 10, 10, 20, 20);
 
             user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
             0
