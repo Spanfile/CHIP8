@@ -6,40 +6,33 @@ extern crate winapi;
 use self::winapi::wingdi;
 use self::winapi::winuser;
 use screen::Screen;
-use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::io::Error;
 use std::iter::once;
 use std::mem;
 use std::os::windows::ffi::OsStrExt;
 use std::ptr::null_mut;
-use std::sync::Mutex;
-
-lazy_static! {
-    static ref SCREEN_LOOKUP: Mutex<HashMap<i32, Box<Screen>>> = {
-        let m = HashMap::new();
-        Mutex::new(m)
-    };
-}
 
 pub struct Window {
-    handle: winapi::HWND,
+    screen: Box<Screen>,
 }
 
 impl Default for Window {
     fn default() -> Window {
-        Window { handle: null_mut() }
+        Window {
+            screen: Default::default(),
+        }
     }
 }
 
 impl Window {
     pub fn new(name: &str, title: &str, width: i32, height: i32, scale: i32) -> Window {
-        Window {
-            handle: match create_window(name, title, width, height, scale) {
-                Ok(window_handle) => window_handle,
-                Err(error) => panic!("Window creation failed. {:?}", error),
-            },
-        }
+        let screen = Box::new(Screen::new(width, height, scale));
+        match create_window(name, title, &screen, Window::window_proc) {
+            Ok(_) => (),
+            Err(error) => panic!("Window creation failed. {:?}", error),
+        };
+        Window { screen }
     }
 
     pub fn dispatch_messages(&self) -> bool {
@@ -66,22 +59,57 @@ impl Window {
         }
     }
 
-    pub fn set_pixel(&self, x: i32, y: i32) {
-        let screen_lookup = SCREEN_LOOKUP.lock().unwrap();
-        let screen = match screen_lookup.get(&(self.handle as i32)) {
-            Some(scr) => scr,
-            None => panic!("no screen found for HWND {:?}", self.handle as i32),
-        };
-        (*screen).set_pixel(x, y);
+    pub fn set_pixel(&mut self, x: i32, y: i32) {
+        self.screen.set_pixel(x, y);
+    }
+
+    unsafe extern "system" fn window_proc(
+        h_wnd: winapi::HWND,
+        msg: winapi::UINT,
+        w_param: winapi::WPARAM,
+        l_param: winapi::LPARAM,
+    ) -> winapi::LRESULT {
+        let mut ps: winuser::PAINTSTRUCT = mem::uninitialized();
+
+        match msg {
+            winuser::WM_PAINT => {
+                println!("paint");
+                let hdc = user32::BeginPaint(h_wnd, &mut ps);
+                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
+
+                let screen =
+                    user32::GetWindowLongPtrA(h_wnd, winuser::GWLP_USERDATA) as *const Screen;
+
+                for (i, pixel) in (*screen).buffer.iter().enumerate() {
+                    if *pixel {
+                        let x = i as i32 % (*screen).width;
+                        let y = i as i32 / (*screen).width;
+                        gdi32::Rectangle(hdc, x, y, x + (*screen).scale, y + (*screen).scale);
+                    }
+                }
+
+                user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
+                0
+            }
+            winuser::WM_DESTROY => {
+                user32::PostQuitMessage(0);
+                0
+            }
+            _ => user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
+        }
     }
 }
 
 fn create_window(
     name: &str,
     title: &str,
-    width: i32,
-    height: i32,
-    scale: i32,
+    screen: &Screen,
+    window_proc: unsafe extern "system" fn(
+        h_wnd: winapi::HWND,
+        msg: winapi::UINT,
+        w_param: winapi::WPARAM,
+        l_param: winapi::LPARAM,
+    ) -> winapi::LRESULT,
 ) -> Result<winapi::HWND, Error> {
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
@@ -109,73 +137,35 @@ fn create_window(
 
         user32::RegisterClassW(&wndc);
 
-        let window_handle = user32::CreateWindowExW(
+        let hwnd = user32::CreateWindowExW(
             winuser::WS_EX_OVERLAPPEDWINDOW,                    // dwExStyle
             name.as_ptr(),                                      // lpClassName
             title.as_ptr(),                                     // lpWindowName
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
             winuser::CW_USEDEFAULT,                             // x
             winuser::CW_USEDEFAULT,                             // y
-            width * scale,                                      // nWidth
-            height * scale,                                     // nHeight
+            screen.width * screen.scale,                        // nWidth
+            screen.height * screen.scale,                       // nHeight
             null_mut(),                                         // hWndParent
             null_mut(),                                         // hMenu
             h_instance,                                         // hInstance
             null_mut(),                                         // lpParam
         );
 
-        let screen = Box::new(Screen::new(width, height, scale));
-        SCREEN_LOOKUP
-            .lock()
-            .unwrap()
-            .insert(window_handle as i32, screen);
+        user32::SetWindowLongPtrA(
+            hwnd,
+            winuser::GWLP_USERDATA,
+            (screen as *const Screen) as i64,
+        );
 
-        if window_handle.is_null() {
+        if hwnd.is_null() {
             Err(Error::last_os_error())
         } else {
-            Ok(window_handle)
+            Ok(hwnd)
         }
     }
 }
 
 fn winstr(value: &str) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(once(0)).collect()
-}
-
-unsafe extern "system" fn window_proc(
-    h_wnd: winapi::HWND,
-    msg: winapi::UINT,
-    w_param: winapi::WPARAM,
-    l_param: winapi::LPARAM,
-) -> winapi::LRESULT {
-    let mut ps: winuser::PAINTSTRUCT = mem::uninitialized();
-
-    match msg {
-        winuser::WM_PAINT => {
-            let hdc = user32::BeginPaint(h_wnd, &mut ps);
-            gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
-
-            let screen_lookup = SCREEN_LOOKUP.lock().unwrap();
-            let screen = match screen_lookup.get(&(h_wnd as i32)) {
-                Some(scr) => scr,
-                None => panic!("no screen found for HWND {:?}", h_wnd as i32),
-            };
-
-            for (i, pixel) in (*screen).buffer.iter().enumerate() {
-                if *pixel {
-                    let x = i as i32 % (*screen).width;
-                    let y = i as i32 / (*screen).width;
-                    gdi32::Rectangle(hdc, x, y, x + (*screen).scale, y + (*screen).scale);
-                }
-            }
-
-            user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
-            0
-        }
-        winuser::WM_DESTROY => {
-            user32::PostQuitMessage(0);
-            0
-        }
-        _ => user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
-    }
 }

@@ -1,3 +1,4 @@
+#[derive(Default)]
 pub struct Screen {
     pub width: i32,
     pub height: i32,
@@ -11,7 +12,7 @@ impl Screen {
             width,
             height,
             scale,
-            buffer: Vec::with_capacity((width * height) as usize),
+            buffer: vec![false; (height * scale) as usize],
         }
     }
 

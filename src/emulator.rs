@@ -18,4 +18,8 @@ impl Emulator {
     pub fn process_events(&self) -> bool {
         self._window.dispatch_messages()
     }
+
+    pub fn draw(&mut self) {
+        self._window.set_pixel(0, 0);
+    }
 }
