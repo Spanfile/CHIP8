@@ -30,7 +30,7 @@ impl Default for Window {
 }
 
 impl Window {
-    pub fn new(name: &str, title: &str, width: i32, height: i32, scale: i32) -> Window {
+    pub fn new(name: &str, title: &str, width: u8, height: u8, scale: i32) -> Window {
         let screen = Box::new(Screen::new(width, height, scale));
         Window {
             hwnd: match create_window(name, title, &screen, Window::window_proc) {
@@ -65,15 +65,31 @@ impl Window {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.screen.clear();
+    pub fn invalidate(&self) {
         unsafe {
             user32::InvalidateRect(self.hwnd, null(), 0);
         }
     }
 
-    pub fn set_pixel(&mut self, x: i32, y: i32) {
-        self.screen.set_pixel(x, y);
+    pub fn clear(&mut self) {
+        self.screen.clear();
+        self.invalidate();
+    }
+
+    pub fn set_pixel(&mut self, x: u8, y: u8, on: bool) {
+        self.screen.set_pixel(x, y, on);
+    }
+
+    pub fn get_pixel(&self, x: u8, y: u8) -> bool {
+        self.screen.get_pixel(x, y)
+    }
+
+    pub fn get_width(&self) -> u8 {
+        self.screen.width
+    }
+
+    pub fn get_height(&self) -> u8 {
+        self.screen.height
     }
 
     unsafe extern "system" fn window_proc(
@@ -94,9 +110,15 @@ impl Window {
 
                 for (i, pixel) in (*screen).buffer.iter().enumerate() {
                     if *pixel {
-                        let x = i as i32 % (*screen).width;
-                        let y = i as i32 / (*screen).width;
-                        gdi32::Rectangle(hdc, x, y, x + (*screen).scale, y + (*screen).scale);
+                        let x = i as u8 % (*screen).width;
+                        let y = i as u8 / (*screen).width;
+                        gdi32::Rectangle(
+                            hdc,
+                            x as i32,
+                            y as i32,
+                            x as i32 + (*screen).scale,
+                            y as i32 + (*screen).scale,
+                        );
                     }
                 }
 
@@ -156,8 +178,8 @@ fn create_window(
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
             winuser::CW_USEDEFAULT,                             // x
             winuser::CW_USEDEFAULT,                             // y
-            screen.width * screen.scale,                        // nWidth
-            screen.height * screen.scale,                       // nHeight
+            screen.width as i32 * screen.scale,                 // nWidth
+            screen.height as i32 * screen.scale,                // nHeight
             null_mut(),                                         // hWndParent
             null_mut(),                                         // hMenu
             h_instance,                                         // hInstance

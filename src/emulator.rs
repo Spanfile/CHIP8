@@ -156,7 +156,12 @@ impl Emulator {
             0xA000 => self.index = nnn,
             0xB000 => self.program_counter = self.registers[0x0] as u16 + nnn,
             0xC000 => self.registers[x_usize] = random::<u8>() & nn,
-            // 0xD000 => {} // TODO
+            0xD000 => {
+                let x = self.registers[x_usize];
+                let y = self.registers[y_usize];
+                let height = n;
+                self.draw_sprite(&x, &y, &height);
+            }
             0xE000 => match nn {
                 0x9E => if self.keypad[self.registers[x_usize] as usize] > 0 {
                     self.program_counter += 2;
@@ -184,8 +189,27 @@ impl Emulator {
         self.program_counter += 2;
     }
 
-    fn draw(&mut self) {
-        self.window.set_pixel(0, 0);
+    fn draw_sprite(&mut self, x: &u8, y: &u8, height: &u8) {
+        self.registers[0xF] = 0;
+
+        for byte_i in 0..*height {
+            let byte = self.memory[(self.index + byte_i as u16) as usize];
+            for bit_i in 0..8 {
+                let bit = (byte >> bit_i) & 0x1;
+                let on = bit > 0;
+                let pixel_x = (x + (7 - bit_i)) % self.window.get_width();
+                let pixel_y = (y + byte_i) % self.window.get_height();
+                let existing = self.window.get_pixel(pixel_x, pixel_y);
+
+                if existing && on {
+                    self.registers[0xF] = 1;
+                }
+
+                self.window.set_pixel(pixel_x, pixel_y, existing ^ on);
+            }
+        }
+
+        self.window.invalidate();
     }
 }
 
