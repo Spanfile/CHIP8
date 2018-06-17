@@ -12,9 +12,9 @@ fn main() {
 
     let mut emulator = Emulator::new(20);
     emulator.load_rom(rom);
-    emulator.cycle();
 
     loop {
+        emulator.cycle();
         if !emulator.process_events() {
             break;
         }

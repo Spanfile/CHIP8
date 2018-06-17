@@ -76,7 +76,6 @@ impl Emulator {
         let n = (opcode & 0x000F) as u8;
         let nn = (opcode & 0x00FF) as u8;
         let nnn = opcode & 0x0FFF;
-        println!("{:x} {:x} {:x} {:x} {:x} {:x}", opcode, x, y, n, nn, nnn);
 
         let x_usize = x as usize;
         let y_usize = y as usize;

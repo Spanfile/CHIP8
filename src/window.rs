@@ -47,7 +47,7 @@ impl Window {
 
             while user32::PeekMessageW(
                 msg,                // lpMsg
-                0 as winapi::HWND,  // hWnd
+                null_mut(),         // hWnd
                 0,                  // wMsgFilterMin
                 0,                  // wMsgFilterMax
                 winuser::PM_REMOVE, // wRemoveMsg
