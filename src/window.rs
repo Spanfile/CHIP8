@@ -73,7 +73,6 @@ impl Window {
 
         match msg {
             winuser::WM_PAINT => {
-                println!("paint");
                 let hdc = user32::BeginPaint(h_wnd, &mut ps);
                 gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
 
