@@ -30,7 +30,7 @@ impl Default for Window {
 }
 
 impl Window {
-    pub fn new(name: &str, title: &str, width: u8, height: u8, scale: i32) -> Window {
+    pub fn new(name: &str, title: &str, width: i32, height: i32, scale: i32) -> Window {
         let screen = Box::new(Screen::new(width, height, scale));
         Window {
             hwnd: match create_window(name, title, &screen, Window::window_proc) {
@@ -42,6 +42,7 @@ impl Window {
     }
 
     pub fn dispatch_messages(&self) -> bool {
+        println!("dispatch");
         unsafe {
             let msg: winuser::LPMSG = mem::uninitialized();
 
@@ -76,19 +77,19 @@ impl Window {
         self.invalidate();
     }
 
-    pub fn set_pixel(&mut self, x: u8, y: u8, on: bool) {
+    pub fn set_pixel(&mut self, x: i32, y: i32, on: bool) {
         self.screen.set_pixel(x, y, on);
     }
 
-    pub fn get_pixel(&self, x: u8, y: u8) -> bool {
+    pub fn get_pixel(&self, x: i32, y: i32) -> bool {
         self.screen.get_pixel(x, y)
     }
 
-    pub fn get_width(&self) -> u8 {
+    pub fn get_width(&self) -> i32 {
         self.screen.width
     }
 
-    pub fn get_height(&self) -> u8 {
+    pub fn get_height(&self) -> i32 {
         self.screen.height
     }
 
@@ -103,21 +104,33 @@ impl Window {
         match msg {
             winuser::WM_PAINT => {
                 let hdc = user32::BeginPaint(h_wnd, &mut ps);
-                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
-
                 let screen =
                     user32::GetWindowLongPtrA(h_wnd, winuser::GWLP_USERDATA) as *const Screen;
 
+                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::BLACK_BRUSH));
+                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::BLACK_PEN));
+
+                gdi32::Rectangle(
+                    hdc,
+                    0,
+                    0,
+                    (*screen).width * (*screen).scale,
+                    (*screen).height * (*screen).scale,
+                );
+
+                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
+                gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_PEN));
+
                 for (i, pixel) in (*screen).buffer.iter().enumerate() {
                     if *pixel {
-                        let x = i as u8 % (*screen).width;
-                        let y = i as u8 / (*screen).width;
+                        let x = (i as i32) % (*screen).width;
+                        let y = (i as i32) / (*screen).width;
                         gdi32::Rectangle(
                             hdc,
-                            x as i32,
-                            y as i32,
-                            x as i32 + (*screen).scale,
-                            y as i32 + (*screen).scale,
+                            x * (*screen).scale,
+                            y * (*screen).scale,
+                            (x + 1) * (*screen).scale,
+                            (y + 1) * (*screen).scale,
                         );
                     }
                 }
@@ -171,6 +184,12 @@ fn create_window(
 
         user32::RegisterClassW(&wndc);
 
+        println!(
+            "{} by {}",
+            screen.width * screen.scale,
+            screen.height * screen.scale
+        );
+
         let hwnd = user32::CreateWindowExW(
             winuser::WS_EX_OVERLAPPEDWINDOW,                    // dwExStyle
             name.as_ptr(),                                      // lpClassName
@@ -178,8 +197,8 @@ fn create_window(
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
             winuser::CW_USEDEFAULT,                             // x
             winuser::CW_USEDEFAULT,                             // y
-            screen.width as i32 * screen.scale,                 // nWidth
-            screen.height as i32 * screen.scale,                // nHeight
+            screen.width * screen.scale,                        // nWidth
+            screen.height * screen.scale,                       // nHeight
             null_mut(),                                         // hWndParent
             null_mut(),                                         // hMenu
             h_instance,                                         // hInstance
