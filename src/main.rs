@@ -12,6 +12,7 @@ fn main() {
 
     let mut emulator = Emulator::new(20);
     emulator.load_rom(rom);
+    emulator.cycle();
 
     loop {
         if !emulator.process_events() {

@@ -1,3 +1,6 @@
+extern crate libc;
+use std::mem;
+
 #[derive(Default)]
 pub struct Screen {
     pub width: i32,
@@ -19,5 +22,15 @@ impl Screen {
     pub fn set_pixel(&mut self, x: i32, y: i32) {
         let index = (x + (y * self.width)) as usize;
         self.buffer[index] = true;
+    }
+
+    pub fn clear(&mut self) {
+        unsafe {
+            libc::memset(
+                self.buffer.as_mut_ptr() as _,
+                0,
+                self.buffer.len() * mem::size_of::<bool>(),
+            );
+        }
     }
 }

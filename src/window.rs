@@ -3,6 +3,7 @@ extern crate kernel32;
 extern crate user32;
 extern crate winapi;
 
+use self::winapi::windef;
 use self::winapi::wingdi;
 use self::winapi::winuser;
 use screen::Screen;
@@ -11,15 +12,18 @@ use std::io::Error;
 use std::iter::once;
 use std::mem;
 use std::os::windows::ffi::OsStrExt;
+use std::ptr::null;
 use std::ptr::null_mut;
 
 pub struct Window {
+    hwnd: windef::HWND,
     screen: Box<Screen>,
 }
 
 impl Default for Window {
     fn default() -> Window {
         Window {
+            hwnd: null_mut(),
             screen: Default::default(),
         }
     }
@@ -28,11 +32,13 @@ impl Default for Window {
 impl Window {
     pub fn new(name: &str, title: &str, width: i32, height: i32, scale: i32) -> Window {
         let screen = Box::new(Screen::new(width, height, scale));
-        match create_window(name, title, &screen, Window::window_proc) {
-            Ok(_) => (),
-            Err(error) => panic!("Window creation failed. {:?}", error),
-        };
-        Window { screen }
+        Window {
+            hwnd: match create_window(name, title, &screen, Window::window_proc) {
+                Ok(hwnd) => hwnd,
+                Err(error) => panic!("Window creation failed. {:?}", error),
+            },
+            screen,
+        }
     }
 
     pub fn dispatch_messages(&self) -> bool {
@@ -56,6 +62,13 @@ impl Window {
             }
 
             true
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.screen.clear();
+        unsafe {
+            user32::InvalidateRect(self.hwnd, null(), 0);
         }
     }
 
@@ -109,7 +122,7 @@ fn create_window(
         w_param: winapi::WPARAM,
         l_param: winapi::LPARAM,
     ) -> winapi::LRESULT,
-) -> Result<winapi::HWND, Error> {
+) -> Result<windef::HWND, Error> {
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
 
