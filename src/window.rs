@@ -161,7 +161,7 @@ fn create_window(
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
 
-        let style = winuser::CS_OWNDC | winuser::CS_HREDRAW | winuser::CS_VREDRAW;
+        let style = winuser::WS_CAPTION | winuser::WS_VISIBLE;
         let icon = user32::LoadIconW(null_mut(), winuser::IDI_APPLICATION);
         let cursor = user32::LoadCursorW(null_mut(), winuser::IDC_ARROW);
         let background = gdi32::CreateSolidBrush(wingdi::RGB(0, 0, 0));
@@ -169,7 +169,8 @@ fn create_window(
         let name = winstr(name);
         let title = winstr(title);
 
-        let wndc = winuser::WNDCLASSW {
+        let wndc = winuser::WNDCLASSEXW {
+            cbSize: mem::size_of::<winuser::WNDCLASSEXW>() as u32,
             style,
             lpfnWndProc: Some(window_proc),
             cbClsExtra: 0,
@@ -180,15 +181,17 @@ fn create_window(
             hbrBackground: background,
             lpszMenuName: null_mut(),
             lpszClassName: name.as_ptr(),
+            hIconSm: null_mut(),
         };
 
-        user32::RegisterClassW(&wndc);
+        user32::RegisterClassExW(&wndc);
 
-        println!(
-            "{} by {}",
-            screen.width * screen.scale,
-            screen.height * screen.scale
-        );
+        let mut client_rect: windef::RECT = mem::uninitialized();
+        client_rect.right = screen.width * screen.scale;
+        client_rect.bottom = screen.height * screen.scale;
+        println!("{} by {}", client_rect.right, client_rect.bottom);
+        user32::AdjustWindowRectEx((&mut client_rect) as windef::LPRECT, style, 0, 0);
+        println!("{} by {}", client_rect.right, client_rect.bottom);
 
         let hwnd = user32::CreateWindowExW(
             winuser::WS_EX_OVERLAPPEDWINDOW,                    // dwExStyle
@@ -197,8 +200,8 @@ fn create_window(
             winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
             winuser::CW_USEDEFAULT,                             // x
             winuser::CW_USEDEFAULT,                             // y
-            screen.width * screen.scale,                        // nWidth
-            screen.height * screen.scale,                       // nHeight
+            client_rect.right,                                  // nWidth
+            client_rect.bottom,                                 // nHeight
             null_mut(),                                         // hWndParent
             null_mut(),                                         // hMenu
             h_instance,                                         // hInstance
