@@ -161,24 +161,29 @@ fn create_window(
     unsafe {
         let h_instance = kernel32::GetCurrentProcess() as winapi::HINSTANCE;
 
-        let style = winuser::WS_CAPTION | winuser::WS_VISIBLE;
+        let class_style = winuser::CS_HREDRAW | winuser::CS_VREDRAW;
+        let window_style = winuser::WS_CAPTION
+            | winuser::WS_VISIBLE
+            | winuser::WS_MINIMIZEBOX
+            | winuser::WS_SYSMENU;
         let icon = user32::LoadIconW(null_mut(), winuser::IDI_APPLICATION);
         let cursor = user32::LoadCursorW(null_mut(), winuser::IDC_ARROW);
-        let background = gdi32::CreateSolidBrush(wingdi::RGB(0, 0, 0));
+        // let background = gdi32::CreateSolidBrush(wingdi::RGB(0, 0, 0));
 
         let name = winstr(name);
         let title = winstr(title);
 
         let wndc = winuser::WNDCLASSEXW {
             cbSize: mem::size_of::<winuser::WNDCLASSEXW>() as u32,
-            style,
+            style: class_style,
             lpfnWndProc: Some(window_proc),
             cbClsExtra: 0,
             cbWndExtra: 0,
             hInstance: h_instance,
             hIcon: icon,
             hCursor: cursor,
-            hbrBackground: background,
+            //hbrBackground: background,
+            hbrBackground: null_mut(),
             lpszMenuName: null_mut(),
             lpszClassName: name.as_ptr(),
             hIconSm: null_mut(),
@@ -187,25 +192,33 @@ fn create_window(
         user32::RegisterClassExW(&wndc);
 
         let mut client_rect: windef::RECT = mem::uninitialized();
+        client_rect.left = 0;
+        client_rect.top = 0;
         client_rect.right = screen.width * screen.scale;
         client_rect.bottom = screen.height * screen.scale;
-        println!("{} by {}", client_rect.right, client_rect.bottom);
-        user32::AdjustWindowRectEx((&mut client_rect) as windef::LPRECT, style, 0, 0);
-        println!("{} by {}", client_rect.right, client_rect.bottom);
+        println!(
+            "{},{}, {} by {}",
+            client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
+        );
+        user32::AdjustWindowRectEx(&mut client_rect, window_style, 0, 0);
+        println!(
+            "{},{}, {} by {}",
+            client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
+        );
 
         let hwnd = user32::CreateWindowExW(
-            winuser::WS_EX_OVERLAPPEDWINDOW,                    // dwExStyle
-            name.as_ptr(),                                      // lpClassName
-            title.as_ptr(),                                     // lpWindowName
-            winuser::WS_OVERLAPPEDWINDOW | winuser::WS_VISIBLE, // dwStyle
-            winuser::CW_USEDEFAULT,                             // x
-            winuser::CW_USEDEFAULT,                             // y
-            client_rect.right,                                  // nWidth
-            client_rect.bottom,                                 // nHeight
-            null_mut(),                                         // hWndParent
-            null_mut(),                                         // hMenu
-            h_instance,                                         // hInstance
-            null_mut(),                                         // lpParam
+            winuser::WS_EX_OVERLAPPEDWINDOW,      // dwExStyle
+            name.as_ptr(),                        // lpClassName
+            title.as_ptr(),                       // lpWindowName
+            window_style,                         // dwStyle
+            winuser::CW_USEDEFAULT,               // x
+            winuser::CW_USEDEFAULT,               // y
+            client_rect.right - client_rect.left, // nWidth
+            client_rect.bottom - client_rect.top, // nHeight
+            null_mut(),                           // hWndParent
+            null_mut(),                           // hMenu
+            h_instance,                           // hInstance
+            null_mut(),                           // lpParam
         );
 
         user32::SetWindowLongPtrA(

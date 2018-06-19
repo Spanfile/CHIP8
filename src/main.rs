@@ -11,7 +11,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let rom = &args[1];
 
-    let mut emulator = Emulator::new(3);
+    let mut emulator = Emulator::new(10);
     emulator.load_rom(rom);
 
     loop {
