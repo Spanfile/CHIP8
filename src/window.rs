@@ -42,7 +42,7 @@ impl Window {
     }
 
     pub fn dispatch_messages(&self) -> bool {
-        println!("dispatch");
+        // println!("dispatch");
         unsafe {
             let msg: winuser::LPMSG = mem::uninitialized();
 
@@ -103,9 +103,10 @@ impl Window {
 
         match msg {
             winuser::WM_PAINT => {
+                // println!("paint");
                 let hdc = user32::BeginPaint(h_wnd, &mut ps);
                 let screen =
-                    user32::GetWindowLongPtrA(h_wnd, winuser::GWLP_USERDATA) as *const Screen;
+                    &*(user32::GetWindowLongPtrA(h_wnd, winuser::GWLP_USERDATA) as *const Screen);
 
                 gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::BLACK_BRUSH));
                 gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::BLACK_PEN));
@@ -114,33 +115,33 @@ impl Window {
                     hdc,
                     0,
                     0,
-                    (*screen).width * (*screen).scale,
-                    (*screen).height * (*screen).scale,
+                    screen.width * screen.scale,
+                    screen.height * screen.scale,
                 );
 
                 gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_BRUSH));
                 gdi32::SelectObject(hdc, gdi32::GetStockObject(wingdi::WHITE_PEN));
 
-                for (i, pixel) in (*screen).buffer.iter().enumerate() {
+                for (i, pixel) in screen.buffer.iter().enumerate() {
                     if *pixel {
-                        let x = (i as i32) % (*screen).width;
-                        let y = (i as i32) / (*screen).width;
+                        let x = (i as i32) % screen.width;
+                        let y = (i as i32) / screen.width;
                         gdi32::Rectangle(
                             hdc,
-                            x * (*screen).scale,
-                            y * (*screen).scale,
-                            (x + 1) * (*screen).scale,
-                            (y + 1) * (*screen).scale,
+                            x * screen.scale,
+                            y * screen.scale,
+                            (x + 1) * screen.scale,
+                            (y + 1) * screen.scale,
                         );
                     }
                 }
 
                 user32::EndPaint(h_wnd, &ps as *const winuser::PAINTSTRUCT);
-                0
+                0 as winapi::LRESULT
             }
             winuser::WM_DESTROY => {
                 user32::PostQuitMessage(0);
-                0
+                0 as winapi::LRESULT
             }
             _ => user32::DefWindowProcW(h_wnd, msg, w_param, l_param),
         }
@@ -196,15 +197,15 @@ fn create_window(
         client_rect.top = 0;
         client_rect.right = screen.width * screen.scale;
         client_rect.bottom = screen.height * screen.scale;
-        println!(
-            "{},{}, {} by {}",
-            client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
-        );
+        // println!(
+        //     "{},{}, {} by {}",
+        //     client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
+        // );
         user32::AdjustWindowRectEx(&mut client_rect, window_style, 0, 0);
-        println!(
-            "{},{}, {} by {}",
-            client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
-        );
+        // println!(
+        //     "{},{}, {} by {}",
+        //     client_rect.left, client_rect.top, client_rect.right, client_rect.bottom
+        // );
 
         let hwnd = user32::CreateWindowExW(
             winuser::WS_EX_OVERLAPPEDWINDOW,      // dwExStyle
